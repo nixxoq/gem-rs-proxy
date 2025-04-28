@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 name = "gem-rs"
 readme = "README.md"
 repository = "https://github.com/0xhades/gem-rs"
-version = "0.1.8"
+version = "0.1.80"
 
 [dependencies]
 base64 = "0.22.1"
