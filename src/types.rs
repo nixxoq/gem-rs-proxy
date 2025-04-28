@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::Path};
 
 use base64::{engine::general_purpose, Engine as _};
 use dotenv::dotenv;
+use futures::stream::Zip;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -672,8 +673,13 @@ enum HarmCategory {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorWrapper {
+    pub error: Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Error {
-    code: i32,
+    code: u32,
     message: String,
     status: String,
 }
@@ -694,27 +700,44 @@ pub enum HarmBlockThreshold {
     BlockNone,                     // All content will be allowed
 }
 
-// #[derive(Debug, Clone, Serialize, Deserialize)]
-// #[serde(rename = "thinkingBudget")]
-// pub struct ThinkingBudget(u32);
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ThinkingBudget {
-    // Rename the *field* within this struct during serialization/deserialization
-    #[serde(rename = "thinkingBudget")]
-    value: u32, // Give the inner value a field name (e.g., 'value')
+#[serde(rename_all = "camelCase")]
+/// Create a new ThinkingConfig with a given thinking budget.
+/// If not used, the model will decide whether to think or not.
+/// Best to not use this, and let the model decide.
+struct ThinkingConfig {
+    thinking_budget: Option<u32>,
+    //enable_thinking: bool,
 }
 
-// Implement a helper function to easily create ThinkingBudget instances
-impl ThinkingBudget {
-    pub fn new(value: u32) -> Self {
-        ThinkingBudget { value }
-    }
-
-    pub fn value(&self) -> u32 {
-        self.value
+impl ThinkingConfig {
+    /// Create a new ThinkingConfig with a given thinking budget.
+    /// If not used, the model will decide whether to think or not.
+    /// Best to not use this, and let the model decide.
+    pub(crate) fn new(thinking_budget: u32) -> Self {
+        ThinkingConfig {
+            thinking_budget: Some(thinking_budget),
+            //thinking_enable: true,
+        }
     }
 }
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// pub struct ThinkingBudget {
+//     // Rename the *field* within this struct during serialization/deserialization
+//     #[serde(rename = "thinkingBudget")]
+//     value: u32, // Give the inner value a field name (e.g., 'value')
+// }
+
+// // Implement a helper function to easily create ThinkingBudget instances
+// impl ThinkingBudget {
+//     pub fn new(value: u32) -> Self {
+//         ThinkingBudget { value }
+//     }
+
+//     pub fn value(&self) -> u32 {
+//         self.value
+//     }
+// }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -725,7 +748,7 @@ pub(crate) struct GenerationConfig {
     temperature: Option<f32>,           // Optional: Controls randomness of the output [0.0, 2.0]
     top_p: Option<f32>, // Optional: Maximum cumulative probability for nucleus sampling
     top_k: Option<u32>, // Optional: Maximum number of tokens to consider for top-k sampling
-    thinking_config: Option<ThinkingBudget>,
+    thinking_config: Option<ThinkingConfig>,
 }
 
 pub struct Settings {
@@ -778,7 +801,7 @@ impl Settings {
         temperature: Option<f32>,
         top_p: Option<f32>,
         top_k: Option<u32>,
-        thinking_config: Option<u32>,
+        thinking_budget: Option<u32>,
     ) {
         self.generation_config = Some(GenerationConfig {
             stop_sequences,
@@ -787,8 +810,8 @@ impl Settings {
             temperature,
             top_p,
             top_k,
-            thinking_config: match thinking_config {
-                Some(config) => Some(ThinkingBudget::new(config)),
+            thinking_config: match thinking_budget {
+                Some(budget) => Some(ThinkingConfig::new(budget)),
                 None => None,
             },
         });
@@ -828,9 +851,12 @@ impl Settings {
         }
     }
 
-    pub fn set_thinking_tokens(&mut self, thinking_tokens: u32) {
+    /// Set the thinking budget for the generation config.
+    /// By default, the thinking budget is None, which means the model will decide whether to think or not.
+    /// Best to not use this, and let the model decide.
+    pub fn set_thinking_budget(&mut self, thinking_budget: u32) {
         match &mut self.generation_config {
-            Some(config) => config.thinking_config = Some(ThinkingBudget::new(thinking_tokens)),
+            Some(config) => config.thinking_config = Some(ThinkingConfig::new(thinking_budget)),
             None => {
                 self.generation_config = Some(GenerationConfig {
                     stop_sequences: None,
@@ -839,7 +865,7 @@ impl Settings {
                     temperature: None,
                     top_p: None,
                     top_k: None,
-                    thinking_config: Some(ThinkingBudget::new(thinking_tokens)),
+                    thinking_config: Some(ThinkingConfig::new(thinking_budget)),
                 });
             }
         }

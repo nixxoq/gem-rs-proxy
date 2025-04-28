@@ -9,7 +9,7 @@ use gem_rs::types::{Blob, Context, FileManager, HarmBlockThreshold, Role, Settin
 #[tokio::main]
 async fn main() {
     init_log();
-    test_stream().await;
+    test().await;
 }
 
 //TODO: Something with the API cause the cached files in cloud to change uri every time they are deleted
@@ -79,7 +79,10 @@ async fn test() {
 
     let mut settings = Settings::new();
     settings.set_all_safety_settings(HarmBlockThreshold::BlockNone);
-    settings.set_thinking_tokens(4000);
+
+    // Set the thinking budget to 4000
+    // This isn't necessary as the model will decide whether to think or not
+    settings.set_thinking_budget(4000);
 
     let response = session
         .send_message("Hello! What is your name?", Role::User, &settings)

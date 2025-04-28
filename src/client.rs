@@ -13,7 +13,7 @@ use reqwest_streams::*;
 
 use crate::api::{Models, GENERATE_CONTENT, STREAM_GENERATE_CONTENT};
 use crate::errors::GemError;
-use crate::types::{Blob, Error, FileData, GenerateContentResponse, Role, Settings};
+use crate::types::{Blob, ErrorWrapper, FileData, GenerateContentResponse, Role, Settings};
 
 pub type StreamResponseResult = Result<
     Box<dyn Stream<Item = Result<GenerateContentResponse, StreamBodyError>> + Unpin>,
@@ -170,6 +170,7 @@ impl Client {
 
         let context = context.build(settings);
         log::info!("Request: {:#?}", serde_json::to_string(&context).unwrap());
+        println!("Request: {:#?}", serde_json::to_string(&context).unwrap());
 
         let response = match self
             .client
@@ -191,6 +192,7 @@ impl Client {
         };
 
         log::info!("Response: {}", response_text);
+        println!("Response: {}", response_text);
 
         let response = match status_code {
             StatusCode::OK => match serde_json::from_str::<GenerateContentResponse>(&response_text)
@@ -200,9 +202,9 @@ impl Client {
                     return Err(GemError::ParsingError(e));
                 }
             },
-            _ => match serde_json::from_str::<Error>(&response_text) {
+            _ => match serde_json::from_str::<ErrorWrapper>(&response_text) {
                 Ok(error) => {
-                    return Err(GemError::GeminiAPIError(error));
+                    return Err(GemError::GeminiAPIError(error.error));
                 }
                 Err(e) => return Err(GemError::ParsingError(e)),
             },
@@ -507,13 +509,13 @@ mod tests {
         let mut session = GemSession::Builder()
             .connect_timeout(std::time::Duration::from_secs(30))
             .timeout(Some(std::time::Duration::from_secs(30)))
-            .model(Models::Gemini2Flash)
+            .model(Models::Gemini25FlashPreview0417)
             .context(Context::new())
             .build();
 
         let mut settings = Settings::new();
         settings.set_all_safety_settings(HarmBlockThreshold::BlockNone);
-        settings.set_thinking_tokens(4000);
+        settings.set_thinking_budget(4000);
 
         let response = session
             .send_message("Write me a poem about the moon", Role::User, &settings)
