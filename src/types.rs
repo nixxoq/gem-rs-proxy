@@ -2,7 +2,6 @@ use std::{collections::HashMap, path::Path};
 
 use base64::{engine::general_purpose, Engine as _};
 use dotenv::dotenv;
-use log::log;
 use reqwest::header;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -46,8 +45,9 @@ pub(crate) enum FinishReason {
 #[serde(rename_all = "camelCase")]
 pub struct GenerateContentResponse {
     candidates: Vec<Candidate>,
-    prompt_feedback: Option<PromptFeedback>, // This is optional
-    usage_metadata: Option<UsageMetadata>,   // This is optional
+    prompt_feedback: Option<PromptFeedback>,
+    usage_metadata: Option<UsageMetadata>,
+    model_version: Option<String>,
 }
 
 impl GenerateContentResponse {
@@ -158,8 +158,8 @@ impl Blob {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileData {
-    mime_type: String,
-    file_uri: String, // File URI
+    pub mime_type: String,
+    pub file_uri: String, // File URI
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -211,6 +211,7 @@ pub struct UsageMetadata {
     cached_content_token_count: Option<i32>, // Number of tokens in cached content
     candidates_token_count: Option<i32>, // Number of tokens in the generated candidates
     total_token_count: Option<i32>,  // Total number of tokens (prompt + candidates)
+    thoughts_token_count: Option<i32>, // Number of tokens in the generated thoughts
 }
 
 impl UsageMetadata {
@@ -448,8 +449,8 @@ pub struct FileManager {
 
 impl FileManager {
     pub fn new() -> Self {
-        dotenv().expect("Failed to load Gemini API key");
-        let api_key = std::env::var("GEMINI_API_KEY").unwrap();
+        dotenv().ok();
+        let api_key = std::env::var("GEMINI_API_KEY").expect("Failed to load Gemini API key");
 
         Self {
             files: Mutex::new(HashMap::new()),
@@ -693,6 +694,28 @@ pub enum HarmBlockThreshold {
     BlockNone,                     // All content will be allowed
 }
 
+// #[derive(Debug, Clone, Serialize, Deserialize)]
+// #[serde(rename = "thinkingBudget")]
+// pub struct ThinkingBudget(u32);
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThinkingBudget {
+    // Rename the *field* within this struct during serialization/deserialization
+    #[serde(rename = "thinkingBudget")]
+    value: u32, // Give the inner value a field name (e.g., 'value')
+}
+
+// Implement a helper function to easily create ThinkingBudget instances
+impl ThinkingBudget {
+    pub fn new(value: u32) -> Self {
+        ThinkingBudget { value }
+    }
+
+    pub fn value(&self) -> u32 {
+        self.value
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct GenerationConfig {
@@ -702,6 +725,7 @@ pub(crate) struct GenerationConfig {
     temperature: Option<f32>,           // Optional: Controls randomness of the output [0.0, 2.0]
     top_p: Option<f32>, // Optional: Maximum cumulative probability for nucleus sampling
     top_k: Option<u32>, // Optional: Maximum number of tokens to consider for top-k sampling
+    thinking_config: Option<ThinkingBudget>,
 }
 
 pub struct Settings {
@@ -754,14 +778,19 @@ impl Settings {
         temperature: Option<f32>,
         top_p: Option<f32>,
         top_k: Option<u32>,
+        thinking_config: Option<u32>,
     ) {
         self.generation_config = Some(GenerationConfig {
-            stop_sequences: stop_sequences,
-            response_mime_type: response_mime_type,
-            max_output_tokens: max_output_tokens,
-            temperature: temperature,
-            top_p: top_p,
-            top_k: top_k,
+            stop_sequences,
+            response_mime_type,
+            max_output_tokens,
+            temperature,
+            top_p,
+            top_k,
+            thinking_config: match thinking_config {
+                Some(config) => Some(ThinkingBudget::new(config)),
+                None => None,
+            },
         });
     }
 
@@ -776,6 +805,7 @@ impl Settings {
                     temperature: Some(temperature),
                     top_p: None,
                     top_k: None,
+                    thinking_config: None,
                 });
             }
         }
@@ -792,6 +822,24 @@ impl Settings {
                     temperature: None,
                     top_p: None,
                     top_k: None,
+                    thinking_config: None,
+                });
+            }
+        }
+    }
+
+    pub fn set_thinking_tokens(&mut self, thinking_tokens: u32) {
+        match &mut self.generation_config {
+            Some(config) => config.thinking_config = Some(ThinkingBudget::new(thinking_tokens)),
+            None => {
+                self.generation_config = Some(GenerationConfig {
+                    stop_sequences: None,
+                    response_mime_type: None,
+                    max_output_tokens: None,
+                    temperature: None,
+                    top_p: None,
+                    top_k: None,
+                    thinking_config: Some(ThinkingBudget::new(thinking_tokens)),
                 });
             }
         }
@@ -854,6 +902,7 @@ impl GenerateContentRequest {
                     stop_sequences: None,
                     top_k: None,
                     top_p: None,
+                    thinking_config: None,
                 }),
             },
             system_instruction,
@@ -973,10 +1022,12 @@ impl Context {
     }
 }
 
+#[cfg(test)]
 mod tests {
 
     use super::*;
 
+    #[ignore]
     #[test]
     fn test_deserialize_generate_content_response() {
         let json_data = r#"

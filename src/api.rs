@@ -20,49 +20,87 @@ pub const STREAM_GENERATE_CONTENT: &str =
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum Models {
     /// Experimental Gemini 1.5 Pro model (version 0827)
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemini-1.5-pro-exp-0827")]
     Gemini15ProExp0827,
 
     /// Experimental Gemini 1.5 Flash model (version 0827)
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemini-1.5-flash-exp-0827")]
     Gemini15FlashExp0827,
 
     /// Experimental Gemini 1.5 Flash 8B model (version 0827)
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemini-1.5-flash-8b-exp-0827")]
     Gemini15Flash8bExp0827,
 
     /// Gemini 1.5 Pro model
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemini-1.5-pro")]
     Gemini15Pro,
 
     /// Default Gemini 2 Flash Experimental model
-    #[default]
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemini-2.0-flash-exp")]
     Gemini2FlashExp,
 
     /// Gemini 2 Experimental model
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemini-exp-1206")]
     Gemini2Exp1206,
 
     /// Gemini 1.5 Flash model
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemini-1.5-flash")]
     Gemini15Flash,
 
     /// Gemini 1.0 Pro model
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemini-1.0-pro")]
     Gemini10Pro,
 
     /// Gemma 2 2B IT model
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemma-2-2b-it")]
     Gemma2_2bIt,
 
     /// Gemma 2 9B IT model
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemma-2-9b-it")]
     Gemma2_9bIt,
 
     /// Gemma 2 27B IT model
+    #[deprecated = "Use custom model instead, if you need to use older models"]
     #[serde(rename = "gemma-2-27b-it")]
     Gemma2_27bIt,
+
+    #[serde(rename = "gemini-2.0-flash")]
+    Gemini2Flash,
+
+    #[serde(rename = "gemini-2.0-flash-lite")]
+    Gemini2FlashLite,
+
+    #[serde(rename = "gemini-2.5-pro-preview-03-25")]
+    Gemini25ProPreview0325,
+
+    #[serde(rename = "gemini-2.5-pro-exp-03-25")]
+    Gemini25ProExp0325,
+
+    #[default]
+    #[serde(rename = "gemini-2.5-flash-preview-04-17")]
+    Gemini25FlashPreview0417,
+
+    #[serde(rename = "gemma-3-1b-it")]
+    Gemma3_1b,
+
+    #[serde(rename = "gemma-3-4b-it")]
+    Gemma3_4b,
+
+    #[serde(rename = "gemma-3-12b-it")]
+    Gemma3_12b,
+
+    #[serde(rename = "gemma-3-27b-it")]
+    Gemma3_27b,
 
     /// Custom model
     Custom(String),

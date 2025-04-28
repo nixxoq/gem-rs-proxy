@@ -12,7 +12,18 @@ Gem-rs is a Rust library that serves as a wrapper around the Gemini API, providi
 - **Caching Files [✅]**: Implement file caching to Gemini.
 - **More File Types**: Add support to more file types eg. gif, doc, docx, code files, etc.
 - **APIs abnormalites**: DELETE "files/x" dosen't delete the cloud cache related to the API key, it only change the URI.
-- **API Key Env** [✅] 
+- **API Key Env** [✅]
+
+- **Adding tool use e.g. [grounding](https://ai.google.dev/gemini-api/docs/grounding?lang=python#configure-search-tool)** []
+- **Configure thinking to be separated from the response in the response handling** []
+
+## Notes
+
+- 2.5 Pro preview models isn't a free model! be aware, use the experimental models instead.
+- The default 'timeout(...)' is None, and you should set it if you want to.
+- When 'timeout(...)' is set, 'read_timeout(...)' is ignored according to the reqwest docs.
+- Use 'timeout(...)' for non-streaming requests. otherwise, the stream will be closed after the timeout even if the server is still responding. 
+- When using a thinking model, you may indicate to the user as "thinking" while waiting for the first tokens, cause as far i know, currently there's no way to get the thinking tokens in the gemini APIs (if possible, PR!).
 
 ## Dependencies
 
@@ -48,7 +59,7 @@ async fn test_file() {
     let mut session = GemSession::Builder()
         .connect_timeout(std::time::Duration::from_secs(30))
         .timeout(std::time::Duration::from_secs(30))
-        .model(Models::Gemini15Flash)
+        .model(Models::Gemini25FlashPreview0417)
         .context(Context::new())
         .build();
 
@@ -82,8 +93,8 @@ async fn test_file() {
 async fn test_stream() {
     let mut session = GemSession::Builder()
         .connect_timeout(std::time::Duration::from_secs(30))
-        .timeout(std::time::Duration::from_secs(30))
-        .model(Models::Gemini15Flash)
+        .read_timeout(std::time::Duration::from_secs(30))
+        .model(Models::Gemini25FlashPreview0417)
         .context(Context::new())
         .build();
 
@@ -120,7 +131,7 @@ async fn test() {
     let mut session = GemSession::Builder()
         .connect_timeout(std::time::Duration::from_secs(30))
         .timeout(std::time::Duration::from_secs(30))
-        .model(Models::Gemini15Flash)
+        .model(Models::Gemini25FlashPreview0417)
         .context(Context::new())
         .build();
 

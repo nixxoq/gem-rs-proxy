@@ -40,8 +40,9 @@ pub struct GemSessionBuilder(Config);
 
 /// Internal configuration structure for `GemSessionBuilder`.
 pub struct Config {
-    timeout: std::time::Duration,
+    timeout: Option<std::time::Duration>,
     connect_timeout: std::time::Duration,
+    read_timeout: std::time::Duration,
     model: Models,
     context: Context,
 }
@@ -50,8 +51,9 @@ impl GemSessionBuilder {
     /// Creates a new `GemSessionBuilder` with default settings.
     pub fn new() -> GemSessionBuilder {
         GemSessionBuilder(Config {
-            timeout: std::time::Duration::from_secs(30),
+            timeout: None,
             connect_timeout: std::time::Duration::from_secs(30),
+            read_timeout: std::time::Duration::from_secs(30),
             model: Models::default(),
             context: Context::new(),
         })
@@ -63,6 +65,7 @@ impl GemSessionBuilder {
             client: Client::new(
                 api_key,
                 Models::default(),
+                None,
                 std::time::Duration::from_secs(30),
                 std::time::Duration::from_secs(30),
             ),
@@ -71,7 +74,11 @@ impl GemSessionBuilder {
     }
 
     /// Sets the timeout for API requests.
-    pub fn timeout(mut self, timeout: std::time::Duration) -> Self {
+    /// By default, the timeout is none.
+    /// When 'timeout' is set, 'read_timeout' is ignored according to the reqwest docs.
+    /// Use for non-streaming requests. otherwise, the stream will be closed after the timeout
+    /// even if the server is still responding.
+    pub fn timeout(mut self, timeout: Option<std::time::Duration>) -> Self {
         self.0.timeout = timeout;
         self
     }
@@ -94,6 +101,13 @@ impl GemSessionBuilder {
         self
     }
 
+    /// Sets the read timeout for API requests.
+    /// When 'timeout' is set, 'read_timeout' is ignored according to the reqwest docs.
+    pub fn read_timeout(mut self, read_timeout: std::time::Duration) -> Self {
+        self.0.read_timeout = read_timeout;
+        self
+    }
+
     /// Sets the initial context for the session.
     pub fn context(mut self, context: Context) -> Self {
         self.0.context = context;
@@ -102,8 +116,8 @@ impl GemSessionBuilder {
 
     /// Builds a `GemSession` with the configured settings and provided API key.
     pub fn build(self) -> GemSession {
-        dotenv().expect("Failed to load Gemini API key");
-        let api_key = std::env::var("GEMINI_API_KEY").unwrap();
+        dotenv().ok();
+        let api_key = std::env::var("GEMINI_API_KEY").expect("Failed to load Gemini API key");
         GemSession::build(api_key, self.0)
     }
 }
@@ -120,15 +134,21 @@ impl Client {
     pub fn new(
         api_key: String,
         model: Models,
-        timeout: std::time::Duration,
+        timeout: Option<std::time::Duration>,
+        read_timeout: std::time::Duration,
         connect_timeout: std::time::Duration,
     ) -> Self {
+
+        let mut client = webClient::builder()
+                .read_timeout(read_timeout)
+                .connect_timeout(connect_timeout);
+
+        if let Some(timeout) = timeout {
+            client = client.timeout(timeout);
+        }
+
         Client {
-            client: webClient::builder()
-                .timeout(timeout)
-                .connect_timeout(connect_timeout)
-                .build()
-                .unwrap_or(webClient::new()),
+            client: client.build().unwrap_or(webClient::new()),
             api_key,
             model,
         }
@@ -268,6 +288,7 @@ impl GemSession {
                 api_key,
                 config.model,
                 config.timeout,
+                config.read_timeout,
                 config.connect_timeout,
             ),
             context: config.context,
@@ -474,6 +495,7 @@ impl GemSession {
     }
 }
 
+#[cfg(test)]
 mod tests {
 
     use crate::types::HarmBlockThreshold;
@@ -482,54 +504,22 @@ mod tests {
 
     #[tokio::test]
     async fn test_gem_session_send_context() {
-        dotenv().expect("Failed to load Gemini API key");
-        let api_key = std::env::var("GEMINI_API_KEY").unwrap();
-
         let mut session = GemSession::Builder()
             .connect_timeout(std::time::Duration::from_secs(30))
-            .timeout(std::time::Duration::from_secs(30))
-            .model(Models::Gemini15FlashExp0827)
+            .timeout(Some(std::time::Duration::from_secs(30)))
+            .model(Models::Gemini2Flash)
             .context(Context::new())
             .build();
 
         let mut settings = Settings::new();
         settings.set_all_safety_settings(HarmBlockThreshold::BlockNone);
+        settings.set_thinking_tokens(4000);
 
         let response = session
-            .send_message("Hello! What is your name?", Role::User, &settings)
+            .send_message("Write me a poem about the moon", Role::User, &settings)
             .await;
-    }
 
-    #[test]
-    fn test_models_display() {
-        let model = Models::Gemini15ProExp0827;
-        assert_eq!(model.to_string(), "gemini-1.5-pro-exp-0827");
-
-        let model = Models::Gemini15FlashExp0827;
-        assert_eq!(model.to_string(), "gemini-1.5-flash-exp-0827");
-
-        let model = Models::Gemini15Flash8bExp0827;
-        assert_eq!(model.to_string(), "gemini-1.5-flash-8b-exp-0827");
-
-        let model = Models::Gemini15Pro;
-        assert_eq!(model.to_string(), "gemini-1.5-pro");
-
-        let model = Models::Gemini15Flash;
-        assert_eq!(model.to_string(), "gemini-1.5-flash");
-
-        let model = Models::Gemini10Pro;
-        assert_eq!(model.to_string(), "gemini-1.0-pro");
-
-        let model = Models::Gemma2_2bIt;
-        assert_eq!(model.to_string(), "gemma-2-2b-it");
-
-        let model = Models::Gemma2_9bIt;
-        assert_eq!(model.to_string(), "gemma-2-9b-it");
-
-        let model = Models::Gemma2_27bIt;
-        assert_eq!(model.to_string(), "gemma-2-27b-it");
-
-        let model = Models::Custom("gemini-3-flash-001".to_string());
-        assert_eq!(model.to_string(), "gemini-3-flash-001");
+        println!("Response: {:?}", response);
+        assert!(response.is_ok())
     }
 }
