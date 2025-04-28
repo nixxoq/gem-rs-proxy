@@ -170,7 +170,6 @@ impl Client {
 
         let context = context.build(settings);
         log::info!("Request: {:#?}", serde_json::to_string(&context).unwrap());
-        println!("Request: {:#?}", serde_json::to_string(&context).unwrap());
 
         let response = match self
             .client
@@ -192,7 +191,6 @@ impl Client {
         };
 
         log::info!("Response: {}", response_text);
-        println!("Response: {}", response_text);
 
         let response = match status_code {
             StatusCode::OK => match serde_json::from_str::<GenerateContentResponse>(&response_text)
