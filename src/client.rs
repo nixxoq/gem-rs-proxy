@@ -86,24 +86,48 @@ impl GemSessionBuilder {
         self
     }
 
+    // /// Sets a proxy configuration
+    // pub fn build_proxy(
+    //     mut self,
+    //     proxy: &str,
+    //     username: Option<&str>,
+    //     password: Option<&str>,
+    // ) -> Result<Self, reqwest::Error> {
+    //     // self.0.proxy = Some(reqwest::Proxy::http(proxy)?);
+    //     let proxy_builder =
+    //         reqwest::Proxy::http(proxy)?.basic_auth(username.unwrap_or(""), password.unwrap_or(""));
+
+    //     self.0.proxy = Some(proxy_builder);
+    //     // if let Some(username) = username {
+    //     //     if let Some(password) = password {
+    //     //         proxy_builder = proxy_builder.basic_auth(username, password);
+    //     //     }
+    //     // }
+    //     Ok(self)
+    // }
+
     /// Sets a proxy configuration
     pub fn build_proxy(
         mut self,
         proxy: &str,
         username: Option<&str>,
         password: Option<&str>,
-    ) -> Result<Self, reqwest::Error> {
+    ) -> Self {
         // self.0.proxy = Some(reqwest::Proxy::http(proxy)?);
-        let proxy_builder =
-            reqwest::Proxy::http(proxy)?.basic_auth(username.unwrap_or(""), password.unwrap_or(""));
+        let proxy_builder = reqwest::Proxy::http(proxy);
+        let proxy = match proxy_builder {
+            Ok(proxy) => Some(proxy.basic_auth(username.unwrap_or(""), password.unwrap_or(""))),
+            _ => None,
+        };
+        // reqwest::Proxy::http(proxy)?.basic_auth(username.unwrap_or(""), password.unwrap_or(""));
 
-        self.0.proxy = Some(proxy_builder);
+        self.0.proxy = proxy;
         // if let Some(username) = username {
         //     if let Some(password) = password {
         //         proxy_builder = proxy_builder.basic_auth(username, password);
         //     }
         // }
-        Ok(self)
+        self
     }
 
     /// Sets the Gemini model to use for the session.
