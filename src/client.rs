@@ -113,20 +113,13 @@ impl GemSessionBuilder {
         username: Option<&str>,
         password: Option<&str>,
     ) -> Self {
-        // self.0.proxy = Some(reqwest::Proxy::http(proxy)?);
-        let proxy_builder = reqwest::Proxy::http(proxy);
+        let proxy_builder = reqwest::Proxy::all(proxy);
         let proxy = match proxy_builder {
             Ok(proxy) => Some(proxy.basic_auth(username.unwrap_or(""), password.unwrap_or(""))),
             _ => None,
         };
-        // reqwest::Proxy::http(proxy)?.basic_auth(username.unwrap_or(""), password.unwrap_or(""));
 
         self.0.proxy = proxy;
-        // if let Some(username) = username {
-        //     if let Some(password) = password {
-        //         proxy_builder = proxy_builder.basic_auth(username, password);
-        //     }
-        // }
         self
     }
 
