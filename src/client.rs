@@ -8,7 +8,7 @@ use super::types::Context;
 use dotenv::dotenv;
 use error::StreamBodyError;
 use futures::Stream;
-use reqwest::{Client as webClient, StatusCode};
+use reqwest::{Client as webClient, Proxy, StatusCode};
 use reqwest_streams::*;
 
 use crate::api::{Models, GENERATE_CONTENT, STREAM_GENERATE_CONTENT};
@@ -45,6 +45,7 @@ pub struct Config {
     read_timeout: std::time::Duration,
     model: Models,
     context: Context,
+    proxy: Option<reqwest::Proxy>,
 }
 
 impl GemSessionBuilder {
@@ -56,6 +57,7 @@ impl GemSessionBuilder {
             read_timeout: std::time::Duration::from_secs(30),
             model: Models::default(),
             context: Context::new(),
+            proxy: None,
         })
     }
 
@@ -68,6 +70,7 @@ impl GemSessionBuilder {
                 None,
                 std::time::Duration::from_secs(30),
                 std::time::Duration::from_secs(30),
+                None,
             ),
             context: Context::new(),
         }
@@ -80,6 +83,12 @@ impl GemSessionBuilder {
     /// even if the server is still responding.
     pub fn timeout(mut self, timeout: Option<std::time::Duration>) -> Self {
         self.0.timeout = timeout;
+        self
+    }
+
+    /// Sets a proxy configuration
+    pub fn proxy(mut self, proxy: reqwest::Proxy) -> Self {
+        self.0.proxy = Some(proxy);
         self
     }
 
@@ -137,11 +146,17 @@ impl Client {
         timeout: Option<std::time::Duration>,
         read_timeout: std::time::Duration,
         connect_timeout: std::time::Duration,
+        proxy: Option<reqwest::Proxy>,
     ) -> Self {
-
+        let _ = proxy;
         let mut client = webClient::builder()
-                .read_timeout(read_timeout)
-                .connect_timeout(connect_timeout);
+            // .proxy(proxy)
+            .read_timeout(read_timeout)
+            .connect_timeout(connect_timeout);
+
+        if let Some(proxy) = proxy {
+            client = client.proxy(proxy);
+        }
 
         if let Some(timeout) = timeout {
             client = client.timeout(timeout);
@@ -290,6 +305,7 @@ impl GemSession {
                 config.timeout,
                 config.read_timeout,
                 config.connect_timeout,
+                config.proxy,
             ),
             context: config.context,
         }
