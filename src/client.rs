@@ -8,7 +8,7 @@ use super::types::Context;
 use dotenv::dotenv;
 use error::StreamBodyError;
 use futures::Stream;
-use reqwest::{Client as webClient, Proxy, StatusCode};
+use reqwest::{Client as webClient, StatusCode};
 use reqwest_streams::*;
 
 use crate::api::{Models, GENERATE_CONTENT, STREAM_GENERATE_CONTENT};
@@ -87,9 +87,23 @@ impl GemSessionBuilder {
     }
 
     /// Sets a proxy configuration
-    pub fn proxy(mut self, proxy: reqwest::Proxy) -> Self {
-        self.0.proxy = Some(proxy);
-        self
+    pub fn build_proxy(
+        mut self,
+        proxy: &str,
+        username: Option<&str>,
+        password: Option<&str>,
+    ) -> Result<Self, reqwest::Error> {
+        // self.0.proxy = Some(reqwest::Proxy::http(proxy)?);
+        let proxy_builder =
+            reqwest::Proxy::http(proxy)?.basic_auth(username.unwrap_or(""), password.unwrap_or(""));
+
+        self.0.proxy = Some(proxy_builder);
+        // if let Some(username) = username {
+        //     if let Some(password) = password {
+        //         proxy_builder = proxy_builder.basic_auth(username, password);
+        //     }
+        // }
+        Ok(self)
     }
 
     /// Sets the Gemini model to use for the session.
@@ -148,9 +162,8 @@ impl Client {
         connect_timeout: std::time::Duration,
         proxy: Option<reqwest::Proxy>,
     ) -> Self {
-        let _ = proxy;
+        // let _ = proxy;
         let mut client = webClient::builder()
-            // .proxy(proxy)
             .read_timeout(read_timeout)
             .connect_timeout(connect_timeout);
 
